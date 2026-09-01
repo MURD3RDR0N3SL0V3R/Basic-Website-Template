@@ -6,8 +6,20 @@
   <h1>This is my example page</h1>
   <p><a href="index.html">Back to home</a></p>
   <canvas id="game canvas" width="400" height="400"></canvas>canvas>
+   <script>
+    var canvas = document.getElementById("gameCanvas");
+    var ctx = canvas.getContext("2d");
+    var CELL = 20;
+ 
+    var snake = { x: 5, y: 5 };
+ 
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, 400, 400);
+ 
+    ctx.fillStyle = "lime";
+    ctx.fillRect(snake.x * CELL, snake.y * CELL, CELL, CELL);
+  </script>
 </body>
 </html>
-<link>SNAKE FUN GAME!<link>
-</body>
-</html>
+  var snake = { x: 15, y: 5 };
+
