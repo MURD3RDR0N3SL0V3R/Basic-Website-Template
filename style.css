@@ -3,16 +3,4 @@ body {
   background-color: hsl(354, 100%, 50%);
   font-family: Georgia, serif;
 }
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-th, td {
-  border: 1px solid #ccc;
-  padding: 10px 14px;
-  text-align: left;
-}
-th {
-  background: #1c1a16;
-  color: white;
-}
+
