@@ -9,12 +9,8 @@ body {
   padding: 20px;
   margin: 40px;
 #my-name {
-  color: navy;
+  color: rgba(98, 4, 185, 0.911);
   font-size: 40px;
-}
-#my-name {
-  width: 600px;
-  margin: 0 auto;
 }
 table{
       border-collapse: collapse;
