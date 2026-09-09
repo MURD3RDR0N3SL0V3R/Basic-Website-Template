@@ -1,7 +1,12 @@
 body {
-  color: hsl(253, 97%, 47%);
-  background-color: hsl(354, 100%, 50%);
+  color: black;
+  background-color: hsl(194, 85%, 56%);
   font-family: Georgia, serif;
+}
+.subtitle { color: red; }
+#my-name {
+  color: navy;
+  font-size: 40px;
 }
 table{
       border-collapse: collapse;
