@@ -1,6 +1,18 @@
 body {
-  color: hsl(253, 100%, 50%);
+  color: hsl(253, 97%, 47%);
   background-color: hsl(354, 100%, 50%);
   font-family: Georgia, serif;
 }
-
+table{
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    th {
+      background: #61f10e;
+      color: rgb(0, 1, 7);
+    }
