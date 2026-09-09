@@ -9,6 +9,11 @@ body {
   padding: 20px;
   margin: 40px;
 }
+.favorites {
+  padding-left: 30px;
+  margin-top: 10px;
+  margin-bottom: 40px;
+}
 #my-name {
   color: navy;
   font-size: 40px;
