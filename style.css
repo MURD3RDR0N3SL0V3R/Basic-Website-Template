@@ -4,6 +4,11 @@ body {
   font-family: Georgia, serif;
 }
 .subtitle { color: red; }
+.subtitle {
+  border: 2px solid black;
+  padding: 20px;
+  margin: 40px;
+}
 #my-name {
   color: navy;
   font-size: 40px;
