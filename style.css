@@ -8,15 +8,13 @@ body {
   border: 2px solid black;
   padding: 20px;
   margin: 40px;
-}
-.favorites {
-  padding-left: 30px;
-  margin-top: 10px;
-  margin-bottom: 40px;
-}
 #my-name {
   color: navy;
   font-size: 40px;
+}
+#my-name {
+  width: 600px;
+  margin: 0 auto;
 }
 table{
       border-collapse: collapse;
