@@ -1,0 +1,81 @@
+  diving: false, // are we currently underground?  
+  diveTimer: 0, // frames left in the dive  
+  diveWasDown: false, // was D held last frame? (so we act once per press)  
+  // --- 2.5 dive underground (press D) ---------------------------------  
+  var diveJustPressed = Input.dive && !Player.diveWasDown;  
+  if (diveJustPressed && !Player.diving && Player.diveTimer <= 0) {  
+    Player.diving = true;  
+    Player.diveTimer = CONFIG.DIVE_FRAMES; // how long we can stay under  
+    Player.vy = 0;  
+    Player.vx = 0;  
+  }  
+  Player.diveWasDown = Input.dive; // always the last line of this block  
+  
+  // while diving: count down, then pop back up; skip normal physics  
+  if (Player.diving) {  
+    Player.diveTimer = Player.diveTimer - 1;  
+    if (Player.diveTimer <= 0) {  
+      Player.diving = false; // forced back up — the claw may still be there  
+    }  
+  }  
+    dive: key === "d",  
+  DIVE_FRAMES: 120, // about 2 seconds underground before we pop back up  
+  CLAW_CHASE_FRAMES: 300, // 5 seconds of claw chase  
+  CLAW_SPEED: 3 // how fast the claw slides toward the player  
+// =====================================================================  
+// claw.js -- a ceiling claw that chases the player and grabs them  
+// States: "hidden" (waiting) -> "chasing" -> "retracting" -> "hidden"  
+// =====================================================================  
+var Claw = {  
+  state: "hidden", // exactly one of: hidden, chasing, retracting  
+  timer: 0, // frames left in the current state  
+  x: 0, // left edge of the claw, in pixels  
+  grabFlash: 0 // frames of black screen left after a grab  
+};  
+  
+// every level starts with the claw hidden and off screen  
+Claw.reset = function () {  
+  Claw.state = "hidden";  
+  Claw.timer = CONFIG.CLAW_WAIT_FRAMES;  
+  Claw.x = -100;  
+  Claw.grabFlash = 0;  
+};  
+  
+Claw.update = function () {  
+  // the black flash after a grab counts down even before anything else  
+  if (Claw.grabFlash > 0) {  
+    Claw.grabFlash = Claw.grabFlash - 1;  
+  }  
+  
+  if (Claw.state === "hidden") {  
+    // wait, then drop down and start the chase  
+    Claw.timer = Claw.timer - 1;  
+    if (Claw.timer <= 0) {  
+      Claw.state = "chasing";  
+      Claw.timer = CONFIG.CLAW_CHASE_FRAMES;  
+      Claw.x = Player.x; // drop right onto the player's position  
+    }  
+  } else if (Claw.state === "chasing") {  
+    // slide toward the player for the chase time  
+    if (Player.x > Claw.x) {  
+      Claw.x = Claw.x + CONFIG.CLAW_SPEED;  
+    }  
+    if (Player.x < Claw.x) {  
+      Claw.x = Claw.x - CONFIG.CLAW_SPEED;  
+    }  
+    // grab check: claw box overlaps the player, and the player is not underground  
+    if (!Player.diving && Collide.hitsSolid === undefined) {  
+      // (this line never runs -- see grab check below)  
+    }  
+    var clawBox = { x: Claw.x, y: 0, w: 60, h: 200 };  
+    var size = CONFIG.PLAYER_SIZE;  
+    var touching =  
+      Player.x + size > clawBox.x &&  
+      Player.x < clawBox.x + clawBox.w &&  
+      Player.y < clawBox.h;  
+    if (touching && !Player.diving) {  
+      // grabbed! flash the screen black for 0.1 seconds  
+      Claw.grabFlash = 6; // about 0.1 seconds at 60 frames per second  
+      Player.reset(); // back to the start of the level  
+      Claw.state = "hidden";  
+      Claw.timer = CONFIG.CLAW_WAIT_FRAMES;  
