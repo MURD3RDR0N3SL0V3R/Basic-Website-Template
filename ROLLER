@@ -79,3 +79,62 @@ Claw.update = function () {
       Player.reset(); // back to the start of the level  
       Claw.state = "hidden";  
       Claw.timer = CONFIG.CLAW_WAIT_FRAMES;  
+  "twolayer": [  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "########",  
+    "########"  
+  ],  
+  "twolayer_gap": [  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "##....##",  
+    "##....##"  
+  ],  
+  "twolayer_spikes": [  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "..^^^...",  
+    "########",  
+    "########",  
+    "########"  
+  ],  
+  "twolayer_upper": [  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "........",  
+    "########",  
+    "........",  
+    "########",  
+    "########"  
+  ]  
+{  
+  "levels": [  
+    { "name": "Robot Creation Lab", "pieces": ["start", "twolayer", "twolayer", "gap", "flat", "twolayer_gap", "flat", "finish"] },  
+    { "name": "Soul Saving Hotel", "pieces": ["start", "twolayer", "twolayer_spikes", "twolayer", "gap", "twolayer_upper", "flat", "finish"] },  
+    { "name": "Chessboard Circus", "pieces": ["start", "twolayer_spikes", "twolayer", "gap", "twolayer_upper", "twolayer_gap", "finish"] },  
+    { "name": "KAP City", "pieces": ["start", "twolayer", "twolayer_spikes", "gap", "twolayer_upper", "twolayer_spikes", "finish"] },  
+    { "name": "Coral Reef", "pieces": ["start", "twolayer_upper", "twolayer_spikes", "twolayer_gap", "twolayer", "gap", "finish"] },  
+    { "name": "Giant Dipper", "pieces": ["start", "twolayer_upper", "gap", "twolayer_spikes", "twolayer_upper", "twolayer_gap", "finish"] },  
+    { "name": "The Code", "pieces": ["start", "twolayer_spikes", "twolayer_upper", "gap", "twolayer_spikes", "twolayer_gap", "twolayer_upper", "finish"] }  
+  ]  
+}  
