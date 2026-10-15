@@ -1,0 +1,458 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Brick Break — Fire Frame</title>
+<style>
+  html,body { height:100%; margin:0; background:#000; display:flex; align-items:center; justify-content:center; }
+  canvas { background:#000; display:block; image-rendering:pixelated; }
+  #ui { position:fixed; top:10px; left:10px; color:white; font-family:system-ui,Segoe UI,Roboto,Arial; z-index:10; }
+  #hint { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); color:#ddd; font-family:system-ui; }
+</style>
+</head>
+<body>
+<div id="ui">Level: <span id="level">1</span> &nbsp; Lives: <span id="lives">3</span> &nbsp; Score: <span id="score">0</span></div>
+<canvas id="c" width="900" height="600"></canvas>
+<div id="hint">Move paddle with mouse or ← → keys. Press Space to launch ball / pause.</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const W = canvas.width, H = canvas.height;
+
+  // Game config (tweakable)
+  const PADDLE_DEFAULT_W = 240; // wide white paddle
+  const PADDLE_H = 14;
+  const BALL_R = 6; // small ball
+  const COLORS = ['#FF3B30','#FF9500','#FFCC00','#34C759','#007AFF','#AF52DE','#FF2D55','#FFFFFF']; // red,orange,yellow,green,blue,purple,pink,white
+
+  // Special effects mapping (names just for clarity)
+  const SPECIALS = ['enlarge','shrink','fast','slow','multi','explode','score']; // assigned randomly to some bricks
+
+  // Game state
+  let levelIndex = 0;
+  let lives = 3;
+  let score = 0;
+  let bricks = [];
+  let balls = [];
+  let paddle = { x: (W - PADDLE_DEFAULT_W)/2, y: H - 80, w: PADDLE_DEFAULT_W, h: PADDLE_H, speed: 12 };
+  let paused = true;
+  let running = true;
+  let currentLevelCount = 5; // 5 random levels
+  const ui = { level: document.getElementById('level'), lives: document.getElementById('lives'), score: document.getElementById('score') };
+
+  // Particle fire frame
+  const particles = [];
+  const PF = 120; // #particles for fire frame
+  for (let i=0;i<PF;i++) particles.push({
+    x: Math.random() < 0.5 ? Math.random()*W : (Math.random()<0.5?0:W),
+    y: Math.random()*H,
+    vx: (Math.random()-0.5)*0.3,
+    vy: -0.4 - Math.random()*1.6,
+    life: 30 + Math.random()*60,
+    ttl: 30 + Math.random()*60,
+    side: Math.random() < 0.5 ? 'topbottom' : 'leftright', // variation
+  });
+
+  // Utility
+  function rand(n){ return Math.floor(Math.random()*n); }
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function randChoice(arr){ return arr[rand(arr.length)]; }
+
+  function spawnBall(x,y,dx,dy){
+    balls.push({ x, y, dx, dy, r: BALL_R, stuck: false });
+  }
+
+  function resetPaddle(){
+    paddle.w = PADDLE_DEFAULT_W;
+    paddle.x = (W - paddle.w)/2;
+  }
+
+  // Level generator — produces a different random layout per level
+  function generateLevel(seedIndex){
+    bricks = [];
+    const rows = 6 + rand(2); // 6-7 rows
+    const cols = 10;
+    const padding = 8;
+    const areaW = W - 200; // center area
+    const brickW = Math.floor(areaW / cols) - padding;
+    const brickH = 20;
+    const offsetX = (W - (brickW + padding)*cols)/2 + 10;
+    const offsetY = 80;
+
+    for (let r=0;r<rows;r++){
+      for (let c=0;c<cols;c++){
+        // choose color from list
+        const color = COLORS[(r + c + seedIndex + rand(8)) % COLORS.length];
+        // some bricks may be stronger (2 hits) — e.g., white might need 2 hits
+        let hits = (color === '#FFFFFF' && Math.random() < 0.5) ? 2 : 1;
+        // assign special effect sometimes (~14%)
+        let special = null;
+        if (Math.random() < 0.14){
+          special = randChoice(SPECIALS);
+          // bias mapping: purple => multi, pink => enlarge, white => explode sometimes
+          if (color === '#AF52DE') special = 'multi';
+          if (color === '#FF2D55') special = 'enlarge';
+          if (color === '#FFFFFF' && Math.random() < 0.6) special = 'explode';
+        }
+        bricks.push({
+          x: offsetX + c*(brickW + padding),
+          y: offsetY + r*(brickH + padding),
+          w: brickW, h: brickH,
+          color, hits, special,
+        });
+      }
+    }
+  }
+
+  function nextLevel(){
+    levelIndex++;
+    if (levelIndex >= currentLevelCount){
+      alert('You cleared all levels! Score: ' + score);
+      levelIndex = 0;
+      lives = 3;
+      score = 0;
+    }
+    resetPaddle();
+    balls = [];
+    spawnBall(paddle.x + paddle.w/2, paddle.y - BALL_R - 4, (Math.random() - 0.5) * 6, -6);
+    generateLevel(levelIndex + Date.now()%1000);
+    paused = true;
+    ui.level.textContent = (levelIndex+1);
+    ui.lives.textContent = lives;
+    ui.score.textContent = score;
+  }
+
+  // Collision helpers
+  function rectCircleCollide(cx,cy,r, rx,ry,rw,rh){
+    const nearestX = clamp(cx, rx, rx+rw);
+    const nearestY = clamp(cy, ry, ry+rh);
+    const dx = cx - nearestX, dy = cy - nearestY;
+    return dx*dx + dy*dy <= r*r;
+  }
+
+  // Apply special effects when brick is hit
+  function applySpecial(name, brick){
+    if (!name) return;
+    switch(name){
+      case 'enlarge':
+        paddle.w = Math.min(W*0.7, paddle.w * 1.5);
+        break;
+      case 'shrink':
+        paddle.w = Math.max(80, paddle.w * 0.65);
+        break;
+      case 'fast':
+        balls.forEach(b => { b.dx *= 1.3; b.dy *= 1.3; });
+        break;
+      case 'slow':
+        balls.forEach(b => { b.dx *= 0.8; b.dy *= 0.8; });
+        break;
+      case 'multi':
+        // spawn two extra balls with slightly different directions
+        const copies = [];
+        balls.slice(0,1).forEach(base => {
+          copies.push({ x: base.x, y: base.y, dx: -base.dx*0.9 + -1.5, dy: -Math.abs(base.dy), r: BALL_R });
+          copies.push({ x: base.x, y: base.y, dx: base.dx*0.9 + 1.5, dy: -Math.abs(base.dy), r: BALL_R });
+        });
+        balls.push(...copies);
+        break;
+      case 'explode':
+        // clear nearby bricks
+        const radius = 60;
+        const cx = brick.x + brick.w/2, cy = brick.y + brick.h/2;
+        let removed = 0;
+        bricks = bricks.filter(b => {
+          const ddx = (b.x + b.w/2) - cx;
+          const ddy = (b.y + b.h/2) - cy;
+          const dist = Math.sqrt(ddx*ddx + ddy*ddy);
+          if (dist <= radius){
+            score += 20;
+            removed++;
+            return false;
+          }
+          return true;
+        });
+        // little score bonus for explode
+        score += removed * 5;
+        break;
+      case 'score':
+        score += 100;
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Game update
+  function update(){
+    if (!running) return;
+    if (!paused){
+      // Move balls
+      for (let i = balls.length - 1; i >= 0; i--){
+        const b = balls[i];
+        b.x += b.dx;
+        b.y += b.dy;
+
+        // wall collisions
+        if (b.x - b.r <= 0){ b.x = b.r; b.dx = -b.dx; }
+        if (b.x + b.r >= W){ b.x = W - b.r; b.dx = -b.dx; }
+        if (b.y - b.r <= 0){ b.y = b.r; b.dy = -b.dy; }
+        // bottom: lose a ball
+        if (b.y - b.r > H){
+          balls.splice(i,1);
+          // if no balls left, lose life
+          if (balls.length === 0){
+            lives--;
+            ui.lives.textContent = lives;
+            if (lives <= 0){
+              alert('Game Over. Score: ' + score);
+              levelIndex = 0;
+              lives = 3;
+              score = 0;
+            }
+            nextLevel();
+            return;
+          }
+          continue;
+        }
+
+        // paddle collision
+        if (rectCircleCollide(b.x,b.y,b.r, paddle.x, paddle.y, paddle.w, paddle.h) && b.dy > 0){
+          // reflect based on hit point to create angle control
+          const rel = (b.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
+          const speed = Math.sqrt(b.dx*b.dx + b.dy*b.dy);
+          const angle = rel * 1.05; // angle bias
+          b.dx = angle * speed * 1.5;
+          b.dy = -Math.abs(Math.sqrt(Math.max(1, speed*speed - b.dx*b.dx)));
+          b.y = paddle.y - b.r - 0.1;
+        }
+
+        // brick collisions
+        for (let j = bricks.length - 1; j >= 0; j--){
+          const br = bricks[j];
+          if (rectCircleCollide(b.x,b.y,b.r, br.x, br.y, br.w, br.h)){
+            // reflect ball: decide whether vertical or horizontal collision by overlap
+            const prevX = b.x - b.dx, prevY = b.y - b.dy;
+            const collidedHoriz = !(prevX + b.r < br.x || prevX - b.r > br.x + br.w);
+            const collidedVert = !(prevY + b.r < br.y || prevY - b.r > br.y + br.h);
+
+            if (collidedHoriz) b.dy = -b.dy;
+            if (collidedVert) b.dx = -b.dx;
+            if (!collidedHoriz && !collidedVert) b.dy = -b.dy; // fallback
+
+            // handle brick hit
+            br.hits--;
+            if (br.hits <= 0){
+              // apply special if present
+              if (br.special) applySpecial(br.special, br);
+              // remove and score
+              score += 10;
+              bricks.splice(j,1);
+            } else {
+              // partially damaged - smaller score
+              score += 5;
+            }
+            ui.score.textContent = score;
+            break;
+          }
+        } // bricks loop
+      } // balls loop
+
+      // Move paddle smoothing (keyboard)
+      if (keys.ArrowLeft) paddle.x -= paddle.speed;
+      if (keys.ArrowRight) paddle.x += paddle.speed;
+      // clamp paddle
+      paddle.x = clamp(paddle.x, 8, W - paddle.w - 8);
+    }
+
+    // update particles for fire frame
+    for (const p of particles){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life--;
+      if (p.life <= 0){
+        // respawn on edges
+        p.life = p.ttl;
+        p.y = H - Math.random()*20;
+        p.x = Math.random() < 0.5 ? Math.random()*W : (Math.random()<0.5?0:W);
+        p.vy = -0.6 - Math.random()*1.4;
+        p.vx = (Math.random()-0.5)*0.6;
+      }
+    }
+
+    // check level clear
+    if (bricks.length === 0){
+      setTimeout(()=> nextLevel(), 250);
+      paused = true;
+    }
+  }
+
+  // Render
+  function render(){
+    // background black
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,W,H);
+
+    // draw bricks
+    for (const b of bricks){
+      // border glow for white bricks
+      if (b.color === '#FFFFFF'){
+        ctx.fillStyle = '#EEE';
+        ctx.fillRect(b.x-1, b.y-1, b.w+2, b.h+2);
+      }
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+
+      // small special indicator
+      if (b.special){
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(b.x + b.w - 18, b.y + 2, 16, 12);
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(b.special[0].toUpperCase(), b.x + b.w - 14, b.y + 11);
+      }
+    }
+
+    // paddle
+    ctx.fillStyle = '#fff';
+    roundRect(ctx, paddle.x, paddle.y, paddle.w, paddle.h, 4);
+    ctx.fill();
+
+    // balls
+    for (const b of balls){
+      ctx.beginPath();
+      ctx.fillStyle = '#fff';
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // HUD hints for specials
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(8, H-140, 220, 120);
+    ctx.fillStyle = '#ddd';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Special bricks:', 16, H-120);
+    const examples = ['Purple=Multi','Pink=Enlarge','White=Explode','Orange=Fast','Blue=Score'];
+    examples.forEach((e,i) => ctx.fillText(e, 18, H-100 + i*18));
+
+    // Fire frame: draw flickering colored glows on edges using particles
+    // Soft glow background
+    const grad = ctx.createLinearGradient(0, 0, 0, 200);
+    grad.addColorStop(0, 'rgba(255,180,50,0.02)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,200);
+
+    // particles
+    for (const p of particles){
+      const lifeRatio = p.life / p.ttl;
+      const alpha = clamp(lifeRatio*1.2, 0, 1);
+      const col = fireColor(Math.random());
+      ctx.fillStyle = `rgba(${col.r},${col.g},${col.b},${alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6*(1-lifeRatio)+2, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // final bright border stroke to emulate fireframe
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const borderGrad = ctx.createLinearGradient(0,0,W,0);
+    borderGrad.addColorStop(0, 'rgba(255,100,40,0.12)');
+    borderGrad.addColorStop(0.5, 'rgba(255,200,40,0.16)');
+    borderGrad.addColorStop(1, 'rgba(255,80,80,0.12)');
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 8;
+    roundedRectStroke(ctx, 4, 4, W-8, H-8, 18);
+    ctx.restore();
+  }
+
+  function fireColor(t){
+    // returns r,g,b for fire-like color
+    const r = 200 + Math.floor(Math.random()*55);
+    const g = 80 + Math.floor(Math.random()*140);
+    const b = 10 + Math.floor(Math.random()*30);
+    return { r, g, b };
+  }
+
+  // helper to stroke rounded rect
+  function roundedRectStroke(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // rounded rect fill helper
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // input
+  const keys = {};
+  window.addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === ' '){
+      if (paused) paused = false;
+      else paused = !paused;
+    }
+  });
+  window.addEventListener('keyup', e => keys[e.key] = false);
+
+  // mouse control for paddle
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    paddle.x = clamp(mx - paddle.w/2, 8, W - paddle.w - 8);
+  });
+
+  // click to launch
+  canvas.addEventListener('click', e => {
+    if (paused) paused = false;
+  });
+
+  // start
+  function start(){
+    levelIndex = 0;
+    lives = 3;
+    score = 0;
+    ui.lives.textContent = lives;
+    ui.score.textContent = score;
+    ui.level.textContent = (levelIndex+1);
+    nextLevel();
+    loop();
+  }
+
+  // main loop
+  function loop(){
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // initialize with one ball stuck to paddle
+  spawnBall(paddle.x + paddle.w/2, paddle.y - BALL_R - 4, (Math.random()-0.5)*6, -6);
+  // start the first level
+  generateLevel(levelIndex);
+  ui.level.textContent = (levelIndex + 1);
+  ui.lives.textContent = lives;
+  ui.score.textContent = score;
+
+  // run
+  start();
+
+})();
+</script>
+</body>
+</html>
